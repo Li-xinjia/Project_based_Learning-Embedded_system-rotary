@@ -29,22 +29,22 @@
 //*****************************************************************************
 // initialize I2C
 //*****************************************************************************
-inline void initI2C(uint32_t base);
+extern inline void initI2C(uint32_t base);
 //*****************************************************************************
 // write 8 bit data on I2C
 //*****************************************************************************
-inline void writeByteI2C(uint32_t base,uint8_t slave_address,uint8_t data);
+extern inline void writeByteI2C(uint32_t base,uint8_t slave_address,uint8_t data);
 //*****************************************************************************
 // write multiple data on I2C
 //*****************************************************************************
-inline void writeDataI2C(uint32_t base,uint8_t slave_address,uint8_t *data,uint8_t length);
+extern inline void writeDataI2C(uint32_t base,uint8_t slave_address,uint8_t *data,uint8_t length);
 //*****************************************************************************
 // read 8 bit data on I2C
 //*****************************************************************************
-inline uint8_t readByteI2C(uint32_t base, uint8_t slave_address);
+extern inline uint8_t readByteI2C(uint32_t base, uint8_t slave_address);
 //*****************************************************************************
 // read multiple data on I2C
 //*****************************************************************************
-inline uint8_t readDataI2C(uint32_t base, uint8_t slave_address, uint8_t *data, uint8_t length);
+extern inline uint8_t readDataI2C(uint32_t base, uint8_t slave_address, uint8_t *data, uint8_t length);
 
 #endif

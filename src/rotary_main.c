@@ -43,21 +43,25 @@
 // as the example is running.
 //
 //*****************************************************************************
+
+int32_t time = 0;
+bool start = false;
+
 void initConsole(void) {
-  // Enable GPIO port A which is used for UART0 pins.
-  SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-  // Configure the pin muxing for UART0 functions on port A0 and A1.
-  // This step is not necessary if your part does not support pin muxing.
-  GPIOPinConfigure(GPIO_PA0_U0RX);
-  GPIOPinConfigure(GPIO_PA1_U0TX);
-  // Enable UART0 so that we can configure the clock.
-  SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
-  // Use the internal 16MHz oscillator as the UART clock source.
-  UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
-  // Select the alternate (UART) function for these pins.
-  GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-  // Initialize the UART for console I/O.
-  UARTStdioConfig(0, 9600, 16000000);
+    // Enable GPIO port A which is used for UART0 pins.
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+    // Configure the pin muxing for UART0 functions on port A0 and A1.
+    // This step is not necessary if your part does not support pin muxing.
+    GPIOPinConfigure(GPIO_PA0_U0RX);
+    GPIOPinConfigure(GPIO_PA1_U0TX);
+    // Enable UART0 so that we can configure the clock.
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+    // Use the internal 16MHz oscillator as the UART clock source.
+    UARTClockSourceSet(UART0_BASE, UART_CLOCK_PIOSC);
+    // Select the alternate (UART) function for these pins.
+    GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+    // Initialize the UART for console I/O.
+    UARTStdioConfig(0, 9600, 16000000);
 }
 
 void initInterruptPins(void) {
@@ -69,6 +73,7 @@ void initInterruptPins(void) {
     // PB0 pull-up
     //GPIOPadConfigSet(GPIO_PORTB_BASE, GPIO_PIN_0,GPIO_STRENGTH_2MA,GPIO_PIN_TYPE_STD_WPU);
 
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
     // Set SW1 as an interrupt
     GPIOIntRegister(GPIO_PORTF_BASE, SW1PinIntHandler);
     // Make pins 4 falling-edge triggered interrupts.
@@ -76,11 +81,19 @@ void initInterruptPins(void) {
     // PF4 pull-up
     GPIOPadConfigSet(GPIO_PORTF_BASE, GPIO_PIN_4, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
 
+    GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_4);
+
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
     // Watch QEI as an interrupt
     GPIOIntRegister(GPIO_PORTD_BASE, REPinIntHandler);
     // Make pins PD6 falling-edge triggered interrupts.
     GPIOIntTypeSet(GPIO_PORTD_BASE, GPIO_INT_PIN_6, GPIO_BOTH_EDGES);
     // (PD6 is physically pulled-up)
+
+    GPIOIntEnable(GPIO_PORTD_BASE, GPIO_INT_PIN_6);
+
+    UARTprintf("Inter\n");
 }
 
 //*****************************************************************************
@@ -88,54 +101,118 @@ void initInterruptPins(void) {
 //*****************************************************************************
 
 void SysTickIntHandler(void) {
-	static uint32_t led_color = LED_ALL;
-	static uint32_t tick_count = 0;
-	if (tick_count % 16 == 0) {
-		led_color = ~led_color;
-		GPIOPinWrite(GPIO_PORTF_BASE,LED_YELLOW,led_color);
-	}
-	tick_count++;
+    static uint32_t led_color = LED_ALL;
+    static uint32_t tick_count = 0;
+    // BAD CODE !!!
+    // DONT COPY THIS !!!
+    if (!start){
+
+    }
+    if (tick_count % 16 == 0) {
+        led_color = ~led_color;
+        GPIOPinWrite(GPIO_PORTF_BASE, LED_YELLOW, led_color);
+        if (start) {
+            GPIOIntDisable(GPIO_PORTF_BASE, GPIO_PIN_4);
+            GPIOIntDisable(GPIO_PORTD_BASE, GPIO_PIN_6);
+            if (time == 0) {
+                start = false;
+                GPIOIntEnable(GPIO_PORTF_BASE, GPIO_PIN_4);
+                GPIOIntEnable(GPIO_PORTD_BASE, GPIO_PIN_6);
+                toneBuzzer(O4C);
+                delay_ms(500);
+                restBuzzer();
+                return;
+            }
+            time -= 1;
+            setAddressLCD(0, 0);
+            writeTextLCD(itoa(time, 3), 3);
+            UARTprintf("%d",time);
+        }
+    }
+    tick_count++;
 }
 
 void SW1PinIntHandler(void) {
+    GPIOIntDisable(GPIO_PORTF_BASE, GPIO_PIN_4);
+    GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4);
+
+    UARTprintf("SW1\n");
+
+    start = true;
+
+    GPIOIntEnable(GPIO_PORTF_BASE, GPIO_PIN_4);
 }
 
 void REPinIntHandler(void) {
+    // Start Interrupt
+    static uint32_t p;
+    static int32_t d;
+
+    GPIOIntDisable(GPIO_PORTD_BASE, GPIO_PIN_6);
+    GPIOIntClear(GPIO_PORTD_BASE, GPIO_PIN_6);
+
+    p = QEIPositionGet(QEI0_BASE);
+    d = QEIDirectionGet(QEI0_BASE);
+
+    if (d == 1) {
+        time += p;
+        if (time > 600) {
+            time = 600;
+        }
+    } else {
+        time -= 100 - p;
+        if (time < 0) {
+            time = 0;
+        }
+    }
+    QEIPositionSet(QEI0_BASE, 0);
+    UARTprintf("time:%d p:%d d:%d\n", time, p, d);
+
+
+    setAddressLCD(0, 0);
+    writeTextLCD(itoa(time, 3), 3);
+
+    delay_ms(100);
+
+    GPIOIntEnable(GPIO_PORTD_BASE, GPIO_PIN_6);
 }
 
 int main(void) {
-  // Set the clocking to run directly from the crystal.
-  ROM_SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_OSC | SYSCTL_OSC_MAIN |
-		     SYSCTL_XTAL_16MHZ);
-  // Set up ports hardware (see periphConf.c)
-  PortFunctionInit();
+    // Set the clocking to run directly from the crystal.
+    ROM_SysCtlClockSet(SYSCTL_SYSDIV_1 | SYSCTL_USE_OSC | SYSCTL_OSC_MAIN |
+                       SYSCTL_XTAL_16MHZ);
 
-  // Set up interrupts (you can specify GPIO interrupt initialization here)
-  initInterruptPins();
+    // Set up ports hardware (see periphConf.c)
+    PortFunctionInit();
 
-  // Initialize console
-  initConsole();
-  UARTprintf("Rotary encoder example\n");
+    // Initialize console
+    initConsole();
+    UARTprintf("Rotary encoder example\n");
 
-  initRotaryEncoder();
+    // Set up interrupts (you can specify GPIO interrupt initialization here)
+    initInterruptPins();
 
-  SysTickPeriodSet(SysCtlClockGet() / SYSTICKS_PER_SEC);
-  SysTickEnable();
-  SysTickIntRegister(SysTickIntHandler);
-  SysTickIntEnable();
+    initI2C(I2C3_BASE);
 
-  // Start Interrupt
-  uint32_t p;
-  int32_t  d;
+    initLCD();
 
-  while(1) {
-      // This loop is for test only.
-      // You shouldn't leave this contents here.
-      // Only while (1); is allowed.
-      p = QEIPositionGet(QEI0_BASE);
-      d = QEIDirectionGet(QEI0_BASE);
-      UARTprintf("P:%2d D:%2d\n",p,d);
-      delay_ms(100);
-  }
+    initBuzzer();
+
+    initRotaryEncoder();
+
+    SysTickPeriodSet(SysCtlClockGet() / SYSTICKS_PER_SEC);
+    SysTickEnable();
+    SysTickIntRegister(SysTickIntHandler);
+    SysTickIntEnable();
+
+
+    while (1) {
+        // This loop is for test only.
+        // You shouldn't leave this contents here.
+        // Only while (1); is allowed.
+
+//        UARTprintf("%d\n", GPIOPinRead(GPIO_PORTF_BASE,GPIO_PIN_4));
+//        delay_ms(100);
+    }
 }
 
