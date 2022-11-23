@@ -103,11 +103,6 @@ void initInterruptPins(void) {
 void SysTickIntHandler(void) {
     static uint32_t led_color = LED_ALL;
     static uint32_t tick_count = 0;
-    // BAD CODE !!!
-    // DONT COPY THIS !!!
-    if (!start){
-
-    }
     if (tick_count % 16 == 0) {
         led_color = ~led_color;
         GPIOPinWrite(GPIO_PORTF_BASE, LED_YELLOW, led_color);
@@ -126,7 +121,6 @@ void SysTickIntHandler(void) {
             time -= 1;
             setAddressLCD(0, 0);
             writeTextLCD(itoa(time, 3), 3);
-            UARTprintf("%d",time);
         }
     }
     tick_count++;
@@ -135,8 +129,6 @@ void SysTickIntHandler(void) {
 void SW1PinIntHandler(void) {
     GPIOIntDisable(GPIO_PORTF_BASE, GPIO_PIN_4);
     GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4);
-
-    UARTprintf("SW1\n");
 
     start = true;
 
