@@ -142,6 +142,7 @@ void REPinIntHandler(void) {
 
     GPIOIntDisable(GPIO_PORTD_BASE, GPIO_PIN_6);
     GPIOIntClear(GPIO_PORTD_BASE, GPIO_PIN_6);
+    QEIDisable(QEI0_BASE);
 
     p = QEIPositionGet(QEI0_BASE);
     d = QEIDirectionGet(QEI0_BASE);
@@ -152,20 +153,18 @@ void REPinIntHandler(void) {
             time = 600;
         }
     } else {
-        time -= 100 - p;
+        time -= 96 - p;
         if (time < 0) {
             time = 0;
         }
     }
     QEIPositionSet(QEI0_BASE, 0);
-    UARTprintf("time:%d p:%d d:%d\n", time, p, d);
 
 
     setAddressLCD(0, 0);
     writeTextLCD(itoa(time, 3), 3);
 
-    delay_ms(100);
-
+    QEIEnable(QEI0_BASE);
     GPIOIntEnable(GPIO_PORTD_BASE, GPIO_PIN_6);
 }
 
